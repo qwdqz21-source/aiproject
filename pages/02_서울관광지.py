@@ -3,14 +3,14 @@ import pandas as pd
 import folium
 from streamlit_folium import st_folium
 
-# 1. 페이지 설정
+# 1. 스트림릿 페이지 기본 설정
 st.set_page_config(
     page_title="외국인이 선호하는 서울 관광지 Top 10",
     page_icon="🗺️",
     layout="wide"
 )
 
-# 2. 데이터 준비 (서울 주요 관광지 Top 10)
+# 2. 서울 주요 관광지 Top 10 데이터 준비
 tourist_spots = [
     {"rank": 1, "name": "경복궁 (Gyeongbokgung Palace)", "lat": 37.5796, "lon": 126.9770, "category": "역사/문화", "desc": "조선 왕조의 대표 궁궐이자 전통 한복 체험의 명소"},
     {"rank": 2, "name": "N서울타워 (N Seoul Tower)", "lat": 37.5512, "lon": 126.9882, "category": "전망대/랜드마크", "desc": "남산 정상에서 서울 시내 전경을 한눈에 조망할 수 있는 랜드마크"},
@@ -26,11 +26,11 @@ tourist_spots = [
 
 df = pd.DataFrame(tourist_spots)
 
-# 3. 화면 타이틀 및 설명
-st.title("🗺️ 외국인이 사랑하는 서울 주요 관광지 Top 10")
-st.markdown("외국인 관광객들에게 가장 인기 있는 서울의 대표 명소 10곳을 지도상에서 확인해보세요.")
+# 3. 헤더 및 소개글
+st.title("🗺️ 외국인이 선호하는 서울 주요 관광지 Top 10")
+st.caption("Folium 지도를 기반으로 제작된 스트림릿 웹 애플리케이션입니다.")
 
-# 4. 사이드바 - 카테고리 필터링 기능
+# 4. 사이드바 - 카테고리 필터
 st.sidebar.header("🔍 검색 및 필터")
 categories = ["전체"] + list(df["category"].unique())
 selected_category = st.sidebar.selectbox("카테고리 선택", categories)
@@ -40,41 +40,49 @@ if selected_category != "전체":
 else:
     filtered_df = df
 
-# 5. 지도 생성 (서울 중심 좌표)
-m = folium.Map(location=[37.5665, 126.9780], zoom_start=12, tiles="OpenStreetMap")
+# 5. Folium 지도 객체 생성 (서울 시청 중심)
+m = folium.Map(
+    location=[37.5665, 126.9780], 
+    zoom_start=11, 
+    tiles="OpenStreetMap"
+)
 
-# 마커 추가
+# 관광지 마커 추가
 for _, row in filtered_df.iterrows():
-    popup_text = f"""
-    <div style="width:200px">
-        <h4>#{row['rank']} {row['name']}</h4>
-        <b>카테고리:</b> {row['category']}<br>
-        <p>{row['desc']}</p>
+    popup_html = f"""
+    <div style="font-family: Arial; width: 220px;">
+        <h4 style="margin-bottom: 5px; color: #1E88E5;">#{row['rank']} {row['name']}</h4>
+        <p style="font-size: 12px; color: #555; margin-bottom: 5px;"><b>카테고리:</b> {row['category']}</p>
+        <p style="font-size: 12px;">{row['desc']}</p>
     </div>
     """
     
     folium.Marker(
         location=[row["lat"], row["lon"]],
-        popup=folium.Popup(popup_text, max_width=250),
+        popup=folium.Popup(popup_html, max_width=260),
         tooltip=f"#{row['rank']} {row['name']}",
-        icon=folium.Icon(color="red", icon="star")
+        icon=folium.Icon(color="red", icon="star", prefix="fa")
     ).add_to(m)
 
-# 6. 화면 레이아웃 (지도 & 상세 리스트)
-col1, col2 = st.columns([2, 1])
+# 6. 화면 레이아웃 분할 (지도 영역 / 목록 영역)
+col_map, col_list = st.columns([2, 1])
 
-with col1:
-    st.subheader("📍 서울 관광지 지도")
-    st_folium(m, width="100%", height=500)
+with col_map:
+    st.subheader("📍 관광지 위치 지도")
+    # folium 지도를 streamlit에 표시
+    st_folium(m, width="100%", height=520)
 
-with col2:
+with col_list:
     st.subheader("📋 관광지 목록")
     for _, row in filtered_df.iterrows():
         with st.expander(f"#{row['rank']} {row['name']}"):
             st.write(f"**카테고리:** {row['category']}")
-            st.write(f"**설명:** {row['desc']}")
+            st.write(f"**상세설명:** {row['desc']}")
 
-# 7. 하단 데이터 테이블
+# 7. 하단 전체 데이터 테이블
 st.markdown("---")
-st.subheader("📊 전체 데이터표")
-st.dataframe(df[["rank", "name", "category", "desc"]].set_index("rank"), use_container_width=True)
+st.subheader("📊 데이터 상세 보기")
+st.dataframe(
+    filtered_df[["rank", "name", "category", "desc"]].set_index("rank"),
+    use_container_width=True
+)
