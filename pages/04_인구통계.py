@@ -5,11 +5,11 @@ import plotly.graph_objects as go
 import streamlit as st
 
 # 1. 페이지 설정
-st.set_page_config(page_title="인구 현황 복합 그래프 분석", layout="wide")
-st.title("📊 행정구/성별/연도별 인구수 분석")
+st.set_page_config(page_title="남녀 인구 꺾은선 그래프 비교", layout="wide")
+st.title("📊 행정구/연도별 남녀 인구수 비교 분석")
 
 
-# 2. 데이터 불러오기 및 전처리 (상위 폴더의 population.csv 경로 지정)
+# 2. 데이터 불러오기 및 전처리
 @st.cache_data
 def load_data():
   current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -53,15 +53,11 @@ st.sidebar.header("⚙️ 검색 조건 선택")
 region_list = df["지역명"].unique().tolist()
 selected_region = st.sidebar.selectbox("행정구 선택", region_list)
 
-# (2) 성별 선택
-gender_options = ["전체(총인구)", "남성", "여성"]
-selected_gender = st.sidebar.selectbox("성별 선택", gender_options)
-
-# (3) 연도 선택 (컬럼명에서 4자리 연도 파싱)
+# (2) 연도 선택 (컬럼명에서 4자리 연도 파싱)
 years = sorted(list(set(re.findall(r"(\d{4})년", " ".join(df.columns)))))
 selected_year = st.sidebar.selectbox("연도 선택", years, index=len(years) - 1)
 
-# 4. 선택 조건별 데이터 추출
+# 4. 선택 조건별 데이터 추출 (남성과 여성 데이터를 동시에 추출)
 age_bins = [
     "0~9세",
     "10~19세",
@@ -76,55 +72,57 @@ age_bins = [
     "100세 이상",
 ]
 
-if selected_gender == "전체(총인구)":
-  gender_prefix = f"{selected_year}년_거주자_"
-elif selected_gender == "남성":
-  gender_prefix = f"{selected_year}년_남_거주자_"
-else:
-  gender_prefix = f"{selected_year}년_여_거주자_"
-
 row_data = df[df["지역명"] == selected_region]
 
-age_pop_values = []
+male_values = []
+female_values = []
+
 for age in age_bins:
-  col_name = f"{gender_prefix}{age}"
-  if col_name in row_data.columns:
-    age_pop_values.append(row_data[col_name].values[0])
-  else:
-    age_pop_values.append(0)
+  m_col = f"{selected_year}년_남_거주자_{age}"
+  f_col = f"{selected_year}년_여_거주자_{age}"
 
-plot_df = pd.DataFrame({"나이(연령대)": age_bins, "인구수": age_pop_values})
+  male_values.append(
+      row_data[m_col].values[0] if m_col in row_data.columns else 0
+  )
+  female_values.append(
+      row_data[f_col].values[0] if f_col in row_data.columns else 0
+  )
 
-# 5. Plotly 복합 그래프 생성 (막대 + 꺾은선)
+plot_df = pd.DataFrame({
+    "나이(연령대)": age_bins,
+    "남성 인구수": male_values,
+    "여성 인구수": female_values,
+})
+
+# 5. Plotly 꺾은선 그래프 생성 (남녀 비교)
 fig = go.Figure()
 
-# (1) 막대그래프 추가
-fig.add_trace(
-    go.Bar(
-        x=plot_df["나이(연령대)"],
-        y=plot_df["인구수"],
-        name="인구수 (막대)",
-        marker=dict(
-            color="rgba(255, 182, 193, 0.6)",  # 은은한 라이트 핑크 (투명도 적용)
-            line=dict(color="#FF69B4", width=1.5),
-        ),
-    )
-)
-
-# (2) 꺾은선그래프 추가
+# (1) 남성 꺾은선 추가 (파란색 계열)
 fig.add_trace(
     go.Scatter(
         x=plot_df["나이(연령대)"],
-        y=plot_df["인구수"],
+        y=plot_df["남성 인구수"],
         mode="lines+markers",
-        name="인구수 (꺾은선)",
-        line=dict(color="#FF1493", width=4),  # 딥 핫핑크
-        marker=dict(size=9, color="#C71585"),
+        name="남성",
+        line=dict(color="#1E90FF", width=3),
+        marker=dict(size=8, color="#0000CD"),
+    )
+)
+
+# (2) 여성 꺾은선 추가 (핫핑크 계열)
+fig.add_trace(
+    go.Scatter(
+        x=plot_df["나이(연령대)"],
+        y=plot_df["여성 인구수"],
+        mode="lines+markers",
+        name="여성",
+        line=dict(color="#FF69B4", width=3),
+        marker=dict(size=8, color="#FF1493"),
     )
 )
 
 fig.update_layout(
-    title=f"<b>{selected_region} - {selected_gender} 인구 분포 ({selected_year}년)</b>",
+    title=f"<b>{selected_region} - 남녀 연령별 인구 분포 비교 ({selected_year}년)</b>",
     xaxis=dict(
         title="나이 (10살 단위 연령대)",
         showgrid=True,
@@ -135,7 +133,7 @@ fig.update_layout(
         title="인구수 (명)",
         showgrid=True,
         gridcolor="lightgray",
-        dtick=100000,  # 10만 단위 눈금
+        dtick=100000,
         tickformat=",",
     ),
     plot_bgcolor="white",
@@ -146,4 +144,4 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 with st.expander("📊 상세 데이터 보기"):
-  st.dataframe(plot_df.T)
+  st.dataframe(plot_df.set_index("나이(연령대)").T)
