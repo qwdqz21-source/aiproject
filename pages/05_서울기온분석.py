@@ -1,3 +1,4 @@
+import os
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
@@ -7,7 +8,7 @@ st.set_page_config(
     page_title="월별 기온 분석", page_icon="🌡️", layout="wide"
 )
 
-# 한글 폰트 깨짐 방지 (시스템에 따라 기본 폰트 설정)
+# 한글 폰트 깨짐 방지
 plt.rcParams["font.family"] = "sans-serif"
 plt.rcParams["axes.unicode_minus"] = False
 
@@ -15,7 +16,11 @@ plt.rcParams["axes.unicode_minus"] = False
 # 데이터 로드 함수 (캐싱 적용)
 @st.cache_data
 def load_data():
-  df = pd.read_csv("temperature.csv", encoding="cp949")
+  # pages 폴더의 상위 폴더에 있는 temperature.csv 경로 지정
+  current_dir = os.path.dirname(os.path.abspath(__file__))
+  file_path = os.path.join(current_dir, "..", "temperature.csv")
+
+  df = pd.read_csv(file_path, encoding="cp949")
   # '일시' 컬럼을 datetime 형식으로 변환 후 연도와 월 추출
   df["연월"] = pd.to_datetime(df["일시"], format="%b-%y")
   df["연도"] = df["연월"].dt.year
@@ -28,8 +33,8 @@ try:
   df = load_data()
 except Exception as e:
   st.error(
-      f"데이터 파일을 불러오는 중 오류가 발생했습니다. 'temperature.csv' 파일이 올바른 위치에 있는지 확인하세요. 에러:"
-      f" {e}"
+      f"데이터 파일을 불러오는 중 오류가 발생했습니다. 상위 폴더에 'temperature.csv' 파일이"
+      f" 있는지 확인하세요. 에러: {e}"
   )
   st.stop()
 
@@ -40,7 +45,7 @@ st.write(
     " 변화를 시각화합니다."
 )
 
-# 사이드바 또는 상단에 월 선택 셀렉트박스 생성 (1월 ~ 12월)
+# 월 선택 셀렉트박스 (1월 ~ 12월)
 month_dict = {
     "1월": 1,
     "2월": 2,
@@ -99,7 +104,7 @@ ax.grid(True, linestyle="--", alpha=0.6)
 # Streamlit에 Matplotlib 그래프 출력
 st.pyplot(fig)
 
-# 하단에 데이터 테이블 제공 (선택 사항)
+# 하단에 데이터 테이블 제공
 with st.expander(f"📁 {selected_month_name} 원본 데이터 상세 보기"):
   st.dataframe(
       filtered_df[["연도", "최고기온(℃)", "최저기온(℃)", "평균기온(℃)"]].reset_index(
