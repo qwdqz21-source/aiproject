@@ -16,11 +16,22 @@ plt.rcParams["axes.unicode_minus"] = False
 # 데이터 로드 함수 (캐싱 적용)
 @st.cache_data
 def load_data():
-  # pages 폴더의 상위 폴더에 있는 temperature.csv 경로 지정
-  current_dir = os.path.dirname(os.path.abspath(__file__))
-  file_path = os.path.join(current_dir, "..", "temperature.csv")
+  # 스트림릿은 pages 폴더 안에서 실행되어도 루트 디렉토리를 기준으로 작동하므로
+  # 'temperature.csv'를 바로 호출하거나, 안전하게 경로를 탐색합니다.
+  file_paths = ["temperature.csv", "../temperature.csv"]
 
-  df = pd.read_csv(file_path, encoding="cp949")
+  df = None
+  for path in file_paths:
+    if os.path.exists(path):
+      df = pd.read_csv(path, encoding="cp949")
+      break
+
+  if df is None:
+    raise FileNotFoundError(
+        "temperature.csv 파일을 찾을 수 없습니다. 루트 폴더에 파일을"
+        " 위치시켜주세요."
+    )
+
   # '일시' 컬럼을 datetime 형식으로 변환 후 연도와 월 추출
   df["연월"] = pd.to_datetime(df["일시"], format="%b-%y")
   df["연도"] = df["연월"].dt.year
@@ -33,8 +44,8 @@ try:
   df = load_data()
 except Exception as e:
   st.error(
-      f"데이터 파일을 불러오는 중 오류가 발생했습니다. 상위 폴더에 'temperature.csv' 파일이"
-      f" 있는지 확인하세요. 에러: {e}"
+      f"데이터 파일을 불러오는 중 오류가 발생했습니다. 프로젝트 루트 폴더에"
+      f" 'temperature.csv' 파일이 있는지 확인하세요.\n에러 내용: {e}"
   )
   st.stop()
 
