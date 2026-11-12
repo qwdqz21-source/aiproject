@@ -1,9 +1,16 @@
 import os
-import koreanize_matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
+
+# koreanize_matplotlib이 없을 경우를 대비한 안전한 임포트
+try:
+  import koreanize_matplotlib
+except ImportError:
+  # 기본 폰트 설정 (리눅스 서버 폰트 깨짐 방지)
+  plt.rcParams["font.family"] = "sans-serif"
+  plt.rcParams["axes.unicode_minus"] = False
 
 st.set_page_config(page_title="기온 예측 및 선형회귀 분석", layout="wide")
 
