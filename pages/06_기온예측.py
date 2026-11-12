@@ -1,18 +1,38 @@
 import os
+from matplotlib import font_manager, rc
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-# koreanize_matplotlib이 없을 경우를 대비한 안전한 임포트
+# OS 환경에 맞춰 한글 폰트 설정
 try:
-  import koreanize_matplotlib
-except ImportError:
-  # 기본 폰트 설정 (리눅스 서버 폰트 깨짐 방지)
-  plt.rcParams["font.family"] = "sans-serif"
-  plt.rcParams["axes.unicode_minus"] = False
+  if os.name == "posix":  # Linux (Streamlit Cloud 환경)
+    # 나눔고딕 등 리눅스 환경의 대표적인 한글 폰트 확인
+    font_path = "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
+    if os.path.exists(font_path):
+      font_name = font_manager.FontProperties(fname=font_path).get_name()
+      rc("font", family=font_name)
+    else:
+      # 시스템에 설치된 나눔 폰트 자동 탐색
+      font_files = font_manager.findSystemFonts(fontpaths=["/usr/share/fonts"])
+      nanum_files = [f for f in font_files if "Nanum" in f]
+      if nanum_files:
+        font_name = font_manager.FontProperties(fname=nanum_files[0]).get_name()
+        rc("font", family=font_name)
+      else:
+        plt.rcParams["font.family"] = "DejaVu Sans"
+  else:  # Windows
+    rc("font", family="Malgun Gothic")
+except Exception:
+  pass
 
-st.set_page_config(page_title="기온 예측 및 선형회귀 분석", layout="wide")
+plt.rcParams["axes.unicode_minus"] = False  # 마이너스 기호 깨짐 방지
+
+# 스트림릿 페이지 설정
+st.set_page_config(
+    page_title="월별 평균기온 분석 및 선형회귀 예측", layout="wide"
+)
 
 st.title("🌡️ 월별 평균기온 분석 및 선형회귀 예측 대시보드")
 st.markdown(
@@ -32,7 +52,7 @@ def load_data(file_source):
   return pd.read_csv(file_source)
 
 
-# 데이터 로드 우선순위: 1) 사용자 직접 업로드 -> 2) 같은 폴더의 temperature.csv -> 3) 샘플 데이터
+# 데이터 로드 우선순위: 1) 사용자 업로드 -> 2) 저장소의 temperature.csv -> 3) 샘플 데이터
 if uploaded_file is not None:
   df = load_data(uploaded_file)
 elif os.path.exists("temperature.csv"):
