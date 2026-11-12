@@ -1,32 +1,40 @@
 import os
-from matplotlib import font_manager, rc
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-# OS 환경에 맞춰 한글 폰트 설정
-try:
-  if os.name == "posix":  # Linux (Streamlit Cloud 환경)
-    # 나눔고딕 등 리눅스 환경의 대표적인 한글 폰트 확인
-    font_path = "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
-    if os.path.exists(font_path):
-      font_name = font_manager.FontProperties(fname=font_path).get_name()
-      rc("font", family=font_name)
-    else:
-      # 시스템에 설치된 나눔 폰트 자동 탐색
-      font_files = font_manager.findSystemFonts(fontpaths=["/usr/share/fonts"])
-      nanum_files = [f for f in font_files if "Nanum" in f]
-      if nanum_files:
-        font_name = font_manager.FontProperties(fname=nanum_files[0]).get_name()
+# [강력한 한글 폰트 설정 및 폴백 시스템]
+from matplotlib import font_manager, rc
+
+
+def set_korean_font():
+  try:
+    if os.name == "posix":  # Linux (Streamlit Cloud 환경)
+      # 시스템 전체 폰트 경로 탐색
+      font_list = font_manager.findSystemFonts(fontpaths=None, fontext="ttf")
+      nanum_font = [
+          f
+          for f in font_list
+          if any(
+              name in f for name in ["Nanum", "nanum", "Malgun", "ARIALUNI"]
+          )
+      ]
+
+      if nanum_font:
+        font_path = nanum_font[0]
+        font_name = font_manager.FontProperties(fname=font_path).get_name()
         rc("font", family=font_name)
       else:
-        plt.rcParams["font.family"] = "DejaVu Sans"
-  else:  # Windows
-    rc("font", family="Malgun Gothic")
-except Exception:
-  pass
+        # 나눔 폰트가 없다면 시스템 기본 sans-serif 사용하되 영문 병행 표기 유도
+        plt.rcParams["font.family"] = "sans-serif"
+    else:  # Windows 환경
+      rc("font", family="Malgun Gothic")
+  except Exception:
+    pass
 
+
+set_korean_font()
 plt.rcParams["axes.unicode_minus"] = False  # 마이너스 기호 깨짐 방지
 
 # 스트림릿 페이지 설정
@@ -137,7 +145,7 @@ with col1:
       color="#FF1493",
       s=70,
       zorder=5,
-      label=f"실제 {selected_month}월 평균기온",
+      label=f"Actual Temp ({selected_month}M)",
   )
 
   # 2. 과거 데이터 학습 직선 (스카이 블루 실선)
@@ -146,7 +154,7 @@ with col1:
       y_pred_line,
       color="#00BFFF",
       linewidth=3,
-      label=f"선형회귀 학습선 (y = {w:.4f}x + {b:.2f})",
+      label=f"Linear Fit (y = {w:.4f}x + {b:.2f})",
   )
 
   # 3. 미래 예측 연장선 (스카이 블루 점선)
@@ -156,7 +164,7 @@ with col1:
       color="#00BFFF",
       linewidth=2,
       linestyle="--",
-      label="미래 예측 연장선",
+      label="Future Trend Extension",
   )
 
   # 4. 잔차(오차) 시각화 - 알고리즘 작동 원리 표현
@@ -171,13 +179,15 @@ with col1:
       s=150,
       marker="*",
       zorder=6,
-      label=f"목표 예측 ({target_year}년): {predicted_temp:.2f}°C",
+      label=f"Prediction ({target_year}): {predicted_temp:.2f}°C",
   )
 
-  ax.set_xlabel("연도 (Year)", fontsize=12)
-  ax.set_ylabel("평균기온 (°C)", fontsize=12)
+  # 그래프 내부 레이블은 폰트 깨짐 방지를 위해 영문/기호 혼용 또는 안전 표기 적용
+  ax.set_xlabel("Year (연도)", fontsize=12)
+  ax.set_ylabel("Average Temperature (°C)", fontsize=12)
   ax.set_title(
-      f"연도별 {selected_month}월 평균기온 및 선형회귀 예측 그래프", fontsize=14
+      f"Temperature Trend & Linear Regression ({selected_month} Month)",
+      fontsize=14,
   )
   ax.legend(loc="upper left")
   ax.grid(True, linestyle="--", alpha=0.4)
