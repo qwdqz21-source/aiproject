@@ -184,6 +184,7 @@ def main() -> None:
 
     tab1, tab2, tab3 = st.tabs(["📌 범죄 종류별 색상 비교", "🗺️ 지역별 색상 비교", "🔥 지역 × 범죄 히트맵"])
 
+    # 1. 범죄 종류별 그래프 (각 대분류/중분류가 속한 대분류 색상을 가짐)
     with tab1:
         major_totals = (
             filtered_df.assign(합계=filtered_df[active_regions].sum(axis=1))
@@ -211,4 +212,188 @@ def main() -> None:
                         hovertemplate="<b>%{y}</b><br>발생 건수: %{x:,}건<extra></extra>",
                     )
                 )
-            fig_major.update_xaxes(title_text="발생 건
+            fig_major.update_xaxes(title_text="발생 건수 (건)", gridcolor="#F0F0F0")
+            fig_major.update_yaxes(title_text="범죄대분류")
+            apply_clean_layout(fig_major, "범죄 대분류별 발생 건수 (대분류 고유 색상)", height=500, show_legend=True)
+            st.plotly_chart(fig_major, use_container_width=True)
+
+        with col_b:
+            top_sub = sub_totals.head(12).iloc[::-1]
+            fig_sub = go.Figure()
+            seen_sub_majors: set[str] = set()
+            for idx, row in top_sub.iterrows():
+                s_name = row["범죄중분류"]
+                m_name = row["범죄대분류"]
+                s_val = int(row["합계"])
+                show_leg = m_name not in seen_sub_majors
+                seen_sub_majors.add(m_name)
+                fig_sub.add_trace(
+                    go.Bar(
+                        x=[s_val],
+                        y=[s_name],
+                        name=m_name,
+                        legendgroup=m_name,
+                        showlegend=show_leg,
+                        orientation="h",
+                        marker=dict(color=get_major_color(m_name, idx)),
+                        text=[f"{s_val:,}건"],
+                        textposition="outside",
+                        customdata=[[m_name]],
+                        hovertemplate=(
+                            "<b>%{y}</b> (%{customdata[0]})<br>"
+                            "발생 건수: %{x:,}건<extra></extra>"
+                        ),
+                    )
+                )
+            fig_sub.update_xaxes(title_text="발생 건수 (건)", gridcolor="#F0F0F0")
+            fig_sub.update_yaxes(title_text="범죄중분류")
+            apply_clean_layout(fig_sub, "범죄 중분류 상위 12개 (상위 대분류 색상)", height=500, show_legend=True)
+            st.plotly_chart(fig_sub, use_container_width=True)
+
+    # 2. 지역별 그래프 (시·도별 색상 또는 최다 범죄대분류 색상)
+    with tab2:
+        top_regions = region_totals.head(top_n).iloc[::-1]
+        sido_totals = region_totals.groupby(sido_map).sum().sort_values(ascending=False)
+
+        col_r1, col_r2 = st.columns([1.2, 1])
+
+        with col_r1:
+            fig_reg = go.Figure()
+            seen_groups: set[str] = set()
+            for idx, (reg_name, reg_val) in enumerate(top_regions.items()):
+                r_val = int(reg_val)
+                s_name = sido_map[reg_name]
+                top_m_row = filtered_df.loc[filtered_df[reg_name].idxmax()]
+                top_m_name = top_m_row["범죄대분류"]
+                top_m_sub = top_m_row["범죄중분류"]
+
+                if region_color_mode == "시·도별 색상":
+                    group_key = s_name
+                    bar_color = get_sido_color(s_name, idx)
+                else:
+                    group_key = top_m_name
+                    bar_color = get_major_color(top_m_name, idx)
+
+                show_leg = group_key not in seen_groups
+                seen_groups.add(group_key)
+
+                fig_reg.add_trace(
+                    go.Bar(
+                        x=[r_val],
+                        y=[reg_name],
+                        name=group_key,
+                        legendgroup=group_key,
+                        showlegend=show_leg,
+                        orientation="h",
+                        marker=dict(color=bar_color),
+                        text=[f"{r_val:,}건"],
+                        textposition="outside",
+                        customdata=[[s_name, top_m_sub, int(top_m_row[reg_name])]],
+                        hovertemplate=(
+                            "<b>%{y}</b> (%{customdata[0]})<br>"
+                            "합계: %{x:,}건<br>"
+                            "최다 범죄: %{customdata[1]} (%{customdata[2]:,}건)<extra></extra>"
+                        ),
+                    )
+                )
+            fig_reg.update_xaxes(title_text="발생 건수 (건)", gridcolor="#F0F0F0")
+            fig_reg.update_yaxes(title_text="지역 / 구분")
+            apply_clean_layout(
+                fig_reg,
+                f"지역별 발생 건수 상위 {top_n}곳 ({region_color_mode})",
+                height=500,
+                show_legend=True,
+            )
+            st.plotly_chart(fig_reg, use_container_width=True)
+
+        with col_r2:
+            fig_sido = go.Figure()
+            for idx, (s_name, s_val) in enumerate(sido_totals.items()):
+                val_int = int(s_val)
+                fig_sido.add_trace(
+                    go.Bar(
+                        x=[s_name],
+                        y=[val_int],
+                        name=s_name,
+                        marker=dict(color=get_sido_color(s_name, idx)),
+                        text=[f"{val_int:,}"],
+                        textposition="outside",
+                        hovertemplate="<b>%{x}</b><br>합계: %{y:,}건<extra></extra>",
+                    )
+                )
+            fig_sido.update_xaxes(title_text="시·도 / 구분")
+            fig_sido.update_yaxes(title_text="발생 건수 (건)", gridcolor="#F0F0F0")
+            apply_clean_layout(fig_sido, "시·도별 발생 건수 합계 (시·도 고유 색상)", height=500, show_legend=True)
+            st.plotly_chart(fig_sido, use_container_width=True)
+
+        st.subheader("🔍 특정 지역 세부 범죄 구성 보기")
+        target_region = st.selectbox(
+            "상세 범죄 항목을 확인할 지역 선택",
+            options=region_totals.index.tolist(),
+        )
+        region_detail = (
+            filtered_df[["범죄대분류", "범죄중분류", target_region]]
+            .rename(columns={target_region: "발생건수"})
+            .sort_values("발생건수", ascending=False)
+        )
+        c_left, c_right = st.columns([1.2, 1])
+        with c_left:
+            top10_reg_crime = region_detail.head(10).iloc[::-1]
+            fig_rd = go.Figure()
+            seen_rd_majors: set[str] = set()
+            for idx, row in top10_reg_crime.iterrows():
+                c_sub = row["범죄중분류"]
+                c_maj = row["범죄대분류"]
+                c_cnt = int(row["발생건수"])
+                show_leg = c_maj not in seen_rd_majors
+                seen_rd_majors.add(c_maj)
+                fig_rd.add_trace(
+                    go.Bar(
+                        x=[c_cnt],
+                        y=[c_sub],
+                        name=c_maj,
+                        legendgroup=c_maj,
+                        showlegend=show_leg,
+                        orientation="h",
+                        marker=dict(color=get_major_color(c_maj, idx)),
+                        text=[f"{c_cnt:,}건"],
+                        textposition="outside",
+                        customdata=[[c_maj]],
+                        hovertemplate="<b>%{y}</b> (%{customdata[0]})<br>%{x:,}건<extra></extra>",
+                    )
+                )
+            fig_rd.update_xaxes(title_text="발생 건수 (건)", gridcolor="#F0F0F0")
+            apply_clean_layout(fig_rd, f"{target_region} 주요 범죄 Top 10 (대분류 색상)", height=400, show_legend=True)
+            st.plotly_chart(fig_rd, use_container_width=True)
+
+        with c_right:
+            st.dataframe(region_detail.reset_index(drop=True), use_container_width=True, height=400)
+
+    # 3. 히트맵
+    with tab3:
+        heat_regions = region_totals.head(min(top_n, 20)).index.tolist()
+        heat_major_df = filtered_df.groupby("범죄대분류", sort=False)[heat_regions].sum()
+        heat_major_df = heat_major_df.loc[heat_major_df.sum(axis=1).sort_values(ascending=True).index]
+
+        fig_heat = go.Figure(
+            go.Heatmap(
+                z=heat_major_df.values,
+                x=heat_major_df.columns.tolist(),
+                y=heat_major_df.index.tolist(),
+                colorscale=[
+                    [0.0, "#FFF5F9"],
+                    [0.35, "#87CEEB"],
+                    [0.7, "#FF69B4"],
+                    [1.0, "#9B5DE5"],
+                ],
+                hovertemplate="지역: <b>%{x}</b><br>대분류: <b>%{y}</b><br>건수: <b>%{z:,}건</b><extra></extra>",
+            )
+        )
+        fig_heat.update_xaxes(title_text="지역 (상위 기준)")
+        fig_heat.update_yaxes(title_text="범죄대분류")
+        apply_clean_layout(fig_heat, "상위 지역 × 범죄 대분류 발생 강도 히트맵", height=520, show_legend=False)
+        st.plotly_chart(fig_heat, use_container_width=True)
+
+
+if __name__ == "__main__":
+    main()
